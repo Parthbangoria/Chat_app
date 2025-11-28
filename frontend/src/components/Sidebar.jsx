@@ -1,12 +1,12 @@
+// frontend/src/components/Sidebar.jsx
 import { useEffect, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
-import { Users } from "lucide-react";
+import { Users, Bot } from "lucide-react";
 
-const Sidebar = () => {
+const Sidebar = ({ onAIChat }) => {
   const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
-
   const { onlineUsers } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
 
@@ -27,7 +27,8 @@ const Sidebar = () => {
           <Users className="size-6" />
           <span className="font-medium hidden lg:block">Contacts</span>
         </div>
-        {/* TODO: Online filter toggle */}
+        
+        {/* Online filter toggle */}
         <div className="mt-3 hidden lg:flex items-center gap-2">
           <label className="cursor-pointer flex items-center gap-2">
             <input
@@ -43,6 +44,25 @@ const Sidebar = () => {
       </div>
 
       <div className="overflow-y-auto w-full py-3">
+        {/* AI Assistant Option */}
+        <button
+          onClick={onAIChat}
+          className="w-full p-3 flex items-center gap-3 hover:bg-base-300 transition-colors border-b border-base-200/50 mb-2"
+        >
+          <div className="relative mx-auto lg:mx-0">
+            <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Bot className="w-6 h-6 text-primary" />
+            </div>
+            <span className="absolute bottom-0 right-0 size-3 bg-green-500 rounded-full ring-2 ring-zinc-900" />
+          </div>
+
+          <div className="hidden lg:block text-left min-w-0">
+            <div className="font-medium">AI Assistant</div>
+            <div className="text-sm text-primary">Always Online</div>
+          </div>
+        </button>
+
+        {/* Regular Users */}
         {filteredUsers.map((user) => (
           <button
             key={user._id}
@@ -84,4 +104,5 @@ const Sidebar = () => {
     </aside>
   );
 };
+
 export default Sidebar;

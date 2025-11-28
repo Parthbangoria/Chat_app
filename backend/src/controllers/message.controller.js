@@ -1,8 +1,10 @@
+// backend/src/controllers/message.controller.js
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
-
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+
+// Remove any import like: import ... from "../lib/ai.js";
 
 export const getUsersForSidebar = async (req, res) => {
   try {

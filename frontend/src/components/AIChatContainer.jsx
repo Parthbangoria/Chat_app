@@ -3,8 +3,21 @@ import { useEffect, useRef, useState } from "react";
 import { useAIChatStore } from "../store/useAIChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
-import { Bot, Send, X } from "lucide-react";
+import { Bot, Send, X, Languages } from "lucide-react";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
+
+const LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "hi", name: "Hindi - हिंदी" },
+  { code: "gu", name: "Gujarati - ગુજરાતી" },
+  { code: "mr", name: "Marathi - मराठी" },
+  { code: "ta", name: "Tamil - தமிழ்" },
+  { code: "te", name: "Telugu - తెలుగు" },
+  { code: "bn", name: "Bengali - বাংলা" },
+  { code: "kn", name: "Kannada - ಕನ್ನಡ" },
+  { code: "ml", name: "Malayalam - മലയാളം" },
+  { code: "pa", name: "Punjabi - ਪੰਜਾਬੀ" },
+];
 
 const AIChatContainer = ({ onClose }) => {
   const {
@@ -19,6 +32,7 @@ const AIChatContainer = ({ onClose }) => {
   
   const { authUser } = useAuthStore();
   const [inputText, setInputText] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const messageEndRef = useRef(null);
 
   useEffect(() => {
@@ -40,7 +54,7 @@ const AIChatContainer = ({ onClose }) => {
 
     const messageText = inputText;
     setInputText("");
-    await sendMessageToAI(messageText);
+    await sendMessageToAI(messageText, selectedLanguage);
   };
 
   if (isMessagesLoading) {
@@ -84,12 +98,32 @@ const AIChatContainer = ({ onClose }) => {
           </button>
         </div>
 
+        {/* Language Selection */}
+        <div className="px-4 py-2 border-b border-base-300 bg-base-200/50">
+          <div className="flex items-center gap-2">
+            <Languages className="w-4 h-4 text-base-content/70" />
+            <label className="text-sm text-base-content/70">Response Language:</label>
+            <select 
+              className="select select-bordered select-sm w-full max-w-xs"
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="text-center text-base-content/60 py-8">
               <Bot className="w-12 h-12 mx-auto mb-4 text-primary/50" />
               <p>Start a conversation with the AI assistant!</p>
+              <p className="text-sm mt-2">Select your preferred language above</p>
             </div>
           ) : (
             messages.map((message) => (

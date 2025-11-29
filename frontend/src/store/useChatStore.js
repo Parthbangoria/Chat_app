@@ -1,3 +1,4 @@
+// frontend/src/store/useChatStore.js
 import { create } from "zustand";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -33,10 +34,12 @@ export const useChatStore = create((set, get) => ({
       set({ isMessagesLoading: false });
     }
   },
+
   sendMessage: async (messageData) => {
     const { selectedUser, messages } = get();
     try {
       const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
+      // Add message immediately from HTTP response to prevent waiting for socket
       set({ messages: [...messages, res.data] });
     } catch (error) {
       toast.error(error.response.data.message);
@@ -53,9 +56,14 @@ export const useChatStore = create((set, get) => ({
       const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
       if (!isMessageSentFromSelectedUser) return;
 
-      set({
-        messages: [...get().messages, newMessage],
-      });
+      // Check if message already exists to prevent duplicates
+      const messageExists = get().messages.some(msg => msg._id === newMessage._id);
+      
+      if (!messageExists) {
+        set({
+          messages: [...get().messages, newMessage],
+        });
+      }
     });
   },
 

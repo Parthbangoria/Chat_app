@@ -20,6 +20,33 @@ try {
   console.error("❌ " + initError);
 }
 
+// Language codes mapping for translation with examples
+const LANGUAGE_NAMES = {
+  en: "English",
+  hi: "Hindi",
+  gu: "Gujarati",
+  mr: "Marathi",
+  ta: "Tamil",
+  te: "Telugu",
+  bn: "Bengali",
+  kn: "Kannada",
+  ml: "Malayalam",
+  pa: "Punjabi",
+};
+
+// Language-specific examples to help AI understand the script
+const LANGUAGE_EXAMPLES = {
+  hi: "उदाहरण: नमस्ते, मैं आपकी मदद करने के लिए यहाँ हूँ।",
+  gu: "ઉદાહરણ: નમસ્તે, હું તમારી મદદ કરવા માટે અહીં છું.",
+  mr: "उदाहरण: नमस्कार, मी तुमची मदत करण्यासाठी येथे आहे.",
+  ta: "உதாரணம்: வணக்கம், நான் உங்களுக்கு உதவ இங்கே இருக்கிறேன்.",
+  te: "ఉదాహరణ: నమస్కారం, నేను మీకు సహాయం చేయడానికి ఇక్కడ ఉన్నాను.",
+  bn: "উদাহরণ: নমস্কার, আমি আপনাকে সাহায্য করতে এখানে আছি।",
+  kn: "ಉದಾಹರಣೆ: ನಮಸ್ಕಾರ, ನಾನು ನಿಮಗೆ ಸಹಾಯ ಮಾಡಲು ಇಲ್ಲಿದ್ದೇನೆ.",
+  ml: "ഉദാഹരണം: നമസ്കാരം, ഞാൻ നിങ്ങളെ സഹായിക്കാൻ ഇവിടെയുണ്ട്.",
+  pa: "ਉਦਾਹਰਣ: ਸਤ ਸ੍ਰੀ ਅਕਾਲ, ਮੈਂ ਤੁਹਾਡੀ ਮਦਦ ਕਰਨ ਲਈ ਇੱਥੇ ਹਾਂ।",
+};
+
 export const getAIMessages = async (req, res) => {
   try {
     console.log("🔍 Getting AI messages for user:", req.user._id);
@@ -27,7 +54,6 @@ export const getAIMessages = async (req, res) => {
     const myId = req.user._id;
     const aiUserId = "ai-assistant";
 
-    // Use $in operator and direct field matching to avoid ObjectId casting issues
     const messages = await Message.find({
       $or: [
         { senderId: myId, receiverId: aiUserId },
@@ -49,11 +75,11 @@ export const getAIMessages = async (req, res) => {
 
 export const sendMessageToAI = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, language = "en" } = req.body;
     const senderId = req.user._id;
     const aiUserId = "ai-assistant";
 
-    console.log("💬 Sending message to AI:", text);
+    console.log("💬 Sending message to AI:", text, "Language:", language);
 
     if (!text || !text.trim()) {
       return res.status(400).json({ error: "Message text is required" });
@@ -80,17 +106,51 @@ export const sendMessageToAI = async (req, res) => {
     let aiResponse = "I apologize, but I'm having trouble generating a response right now. Please try again in a moment.";
 
     try {
-      // Generate AI response
+      // Generate AI response with language specification
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const prompt = `You are a helpful AI assistant in a chat application. Please respond to this message in a friendly and conversational way (keep responses under 200 words): "${text.trim()}"`;
+      
+      const languageName = LANGUAGE_NAMES[language] || "English";
+      
+      let prompt;
+      if (language === "en") {
+        prompt = `You are a helpful AI assistant in a chat application. Please respond to this message in a friendly and conversational way (keep responses under 200 words): "${text.trim()}"`;
+      } else {
+        // More explicit translation instruction with examples
+        const languageExample = LANGUAGE_EXAMPLES[language] || "";
+        
+        prompt = `You are a helpful AI assistant in a chat application. 
+
+CRITICAL REQUIREMENT: You MUST respond COMPLETELY in ${languageName} language using proper ${languageName} script. DO NOT use English or Roman script at all.
+
+${languageExample ? `Script Example: ${languageExample}` : ''}
+
+User's message: "${text.trim()}"
+
+Your Response Requirements:
+1. Write your ENTIRE response using ${languageName} script/characters
+2. Be helpful, friendly, and conversational
+3. Keep response under 200 words
+4. Use native ${languageName} words, not transliterated English
+5. If you don't understand the message, still respond in ${languageName}
+
+Now write your complete response in ${languageName} script:`;
+      }
+      
+      console.log("🤖 Generating AI response in", languageName);
+      console.log("📝 Prompt:", prompt);
       
       const result = await model.generateContent(prompt);
       aiResponse = result.response.text();
-      console.log("✅ AI response generated");
+      
+      console.log("✅ AI response generated:", aiResponse);
+      console.log("✅ Language:", languageName);
       
     } catch (aiError) {
       console.error("❌ Error generating AI response:", aiError.message);
-      // Use fallback response
+      // Use fallback response in selected language
+      if (language !== "en") {
+        aiResponse = `क्षमा करें, मैं अभी आपको उत्तर देने में असमर्थ हूं। कृपया पुनः प्रयास करें। (Sorry, I'm unable to respond right now. Please try again.)`;
+      }
     }
 
     // Save AI response
@@ -102,18 +162,23 @@ export const sendMessageToAI = async (req, res) => {
     await aiMessage.save();
     console.log("✅ AI message saved");
 
-    // Emit real-time updates
-    const userSocketId = getReceiverSocketId(senderId);
-    if (userSocketId) {
-      io.to(userSocketId).emit("newMessage", userMessage);
-      io.to(userSocketId).emit("newMessage", aiMessage);
-      console.log("✅ Messages sent via socket");
-    }
-
+    // Send response BEFORE emitting to socket to avoid race conditions
     res.status(201).json({
       userMessage,
       aiMessage
     });
+
+    // Emit real-time updates AFTER sending response
+    // Only emit to the user's socket if they're connected
+    const userSocketId = getReceiverSocketId(senderId);
+    if (userSocketId) {
+      // Small delay to ensure client has processed the HTTP response
+      setTimeout(() => {
+        io.to(userSocketId).emit("newMessage", userMessage);
+        io.to(userSocketId).emit("newMessage", aiMessage);
+        console.log("✅ Messages sent via socket");
+      }, 100);
+    }
 
   } catch (error) {
     console.error("❌ Error in sendMessageToAI:", error.message);
